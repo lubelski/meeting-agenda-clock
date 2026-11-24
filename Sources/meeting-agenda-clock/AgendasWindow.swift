@@ -19,7 +19,7 @@ struct AgendasRootView: View {
             detail
                 .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
         }
-        .navigationTitle(model.selectedAgenda?.name ?? "Agendas")
+        .standardTitleBar()
     }
 
     @ViewBuilder private var detail: some View {

@@ -88,7 +88,7 @@ struct SettingsRootView: View {
                 .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
         }
         .frame(width: Self.size.width, height: Self.size.height)
-        .navigationTitle(section.title)
+        .standardTitleBar()
         // Turning the experiment off while its section shows lands on Experiments.
         .onChange(of: phoneOn) { _, on in
             if !on, storedSection == .phone { storedSection = .experiments }
