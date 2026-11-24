@@ -8,7 +8,11 @@ keep the timing on the other: a big countdown, the sections, and where you shoul
   agenda's pane becomes the live view with its controls.
 - **Clock window**: a dark window with one huge countdown, for the second display.
 - **Menu bar item**: the run's state and controls, or a list of agendas to start.
-- **Settings**: General, Experiments (Edge line is the one built so far), Debugging.
+- **Settings**: General, Experiments (Edge line and Phone clock over Wi-Fi are built so far),
+  Debugging.
+- **Phone clock over Wi-Fi** (an experiment): the Mac serves a small page on the local network
+  that a phone opens in its browser to show the clock and control the run. Turn it on in
+  Settings, Experiments, then scan the code in Settings, Phone.
 
 ## Build and run
 

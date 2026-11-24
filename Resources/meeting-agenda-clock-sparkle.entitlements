@@ -4,6 +4,8 @@
 <dict>
   <!-- The Developer ID build's entitlements: the App Sandbox, as in meeting-agenda-clock.entitlements, plus what Sparkle needs in a sandboxed app. The App Store build uses meeting-agenda-clock.entitlements, which has none of this. -->
   <key>com.apple.security.app-sandbox</key><true/>
+  <!-- The phone clock experiment listens for the phone's browser on the local network. -->
+  <key>com.apple.security.network.server</key><true/>
   <!-- Lets the app talk to Sparkle's installer tools once they run (Sparkle's sandboxing documentation). The names are the bundle identifier with -spks and -spki. -->
   <key>com.apple.security.temporary-exception.mach-lookup.global-name</key>
   <array>

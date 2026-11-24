@@ -10,6 +10,9 @@ public enum Experiment: String, CaseIterable, Sendable, Identifiable {
     case floatingPanel
     case paceByTaps
     case countQuestions
+    /// The Mac serves a page that a phone on the same Wi-Fi opens to show the clock and control
+    /// the run. See `PhoneServer` and `PhoneClockController`.
+    case phoneClock
 
     public var id: String { rawValue }
 
@@ -21,11 +24,12 @@ public enum Experiment: String, CaseIterable, Sendable, Identifiable {
         case .floatingPanel: "ExperimentFloatingPanel"
         case .paceByTaps: "ExperimentPaceByTaps"
         case .countQuestions: "ExperimentCountQuestions"
+        case .phoneClock: "ExperimentPhoneClock"
         }
     }
 
     /// Whether turning it on does anything yet.
-    public var isBuilt: Bool { self == .edgeLine }
+    public var isBuilt: Bool { self == .edgeLine || self == .phoneClock }
 
     public var title: String {
         switch self {
@@ -35,6 +39,7 @@ public enum Experiment: String, CaseIterable, Sendable, Identifiable {
         case .floatingPanel: "Floating panel"
         case .paceByTaps: "Pace by taps"
         case .countQuestions: "Count questions"
+        case .phoneClock: "Phone clock over Wi-Fi"
         }
     }
 
@@ -52,6 +57,8 @@ public enum Experiment: String, CaseIterable, Sendable, Identifiable {
             "Sections move on only when you choose Next Section, and the clock says how far ahead of or behind the plan you are."
         case .countQuestions:
             "For an exam, say how many questions it has, and the clock shows which question you should be on."
+        case .phoneClock:
+            "The Mac serves a page that a phone opens in its browser to show the clock and control the run. Anyone with the link on the same Wi-Fi can control the run."
         }
         return isBuilt ? text : text + " Not built yet."
     }

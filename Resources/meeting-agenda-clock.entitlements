@@ -2,7 +2,9 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <!-- The App Sandbox, on from the start so the App Store stays possible. Nothing else is needed yet. -->
+  <!-- The App Sandbox, on from the start so the App Store stays possible.  -->
   <key>com.apple.security.app-sandbox</key><true/>
+  <!-- The phone clock experiment listens for the phone's browser on the local network. -->
+  <key>com.apple.security.network.server</key><true/>
 </dict>
 </plist>

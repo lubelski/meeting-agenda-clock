@@ -98,9 +98,10 @@ import Testing
 
     @Test func experimentsAreOffAndOnlyEdgeLineIsBuilt() {
         let defaults = UserDefaults(suiteName: "test-\(UUID().uuidString)")!
-        #expect(Experiment.allCases.count == 6)
+        #expect(Experiment.allCases.count == 7)
         #expect(Experiment.allCases.allSatisfy { !$0.isOn(defaults) })
-        #expect(Experiment.allCases.filter(\.isBuilt) == [.edgeLine])
+        #expect(Experiment.allCases.filter(\.isBuilt) == [.edgeLine, .phoneClock])
+        #expect(Experiment.phoneClock.description.contains("Anyone with the link on the same Wi-Fi can control the run."))
         for experiment in Experiment.allCases where !experiment.isBuilt {
             #expect(experiment.description.hasSuffix("Not built yet."))
         }

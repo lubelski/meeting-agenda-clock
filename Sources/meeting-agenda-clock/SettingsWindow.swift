@@ -9,6 +9,8 @@ import SwiftUI
 /// Experiments, with its view in `SettingsRootView.detail`.
 enum SettingsSection: String, CaseIterable, Identifiable {
     case general
+    /// Only while the phone clock experiment is on.
+    case phone
     case experiments
     case debugging
 
@@ -17,6 +19,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .general: "General"
+        case .phone: "Phone"
         case .experiments: "Experiments"
         case .debugging: "Debugging"
         }
@@ -25,20 +28,36 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     var symbolName: String {
         switch self {
         case .general: "gearshape"
+        case .phone: "iphone"
         case .experiments: "flask"
         case .debugging: "ladybug"
         }
+    }
+
+    /// The sections in the sidebar. Phone shows only with its experiment on.
+    static func visible(phoneOn: Bool) -> [SettingsSection] {
+        allCases.filter { $0 != .phone || phoneOn }
     }
 }
 
 /// The Settings window's content: a fixed-width sidebar of sections, and the section beside it.
 struct SettingsRootView: View {
     static let sidebarWidth: CGFloat = 180
-    static let size = CGSize(width: 700, height: 460)
+    static let size = CGSize(width: 720, height: 560)
+    static let selectedSectionKey = "SettingsSelectedSection"
 
     let dataFolder: URL
     let updater: AppUpdater
-    @AppStorage("SettingsSelectedSection") private var section: SettingsSection = .general
+    let phone: PhoneClockController?
+    @AppStorage(Self.selectedSectionKey) private var storedSection: SettingsSection = .general
+    @AppStorage(Experiment.phoneClock.key) private var phoneOn = false
+
+    /// The section showing. A remembered Phone section with the experiment off shows Experiments,
+    /// where its switch is.
+    private var section: SettingsSection {
+        get { storedSection == .phone && !phoneOn ? .experiments : storedSection }
+        nonmutating set { storedSection = newValue }
+    }
     @Environment(\.isRenderingPreview) private var rendering
 
     var body: some View {
@@ -49,7 +68,7 @@ struct SettingsRootView: View {
                 get: { rendering ? nil : section },
                 set: { if let new = $0 { section = new } }
             )) {
-                ForEach(SettingsSection.allCases) { section in
+                ForEach(SettingsSection.visible(phoneOn: phoneOn)) { section in
                     // The sidebar draws the selected row's title heavier, which widens it. A
                     // weight on the title's own Text overrides that, so the row keeps one
                     // weight across hover and selection.
@@ -70,11 +89,19 @@ struct SettingsRootView: View {
         }
         .frame(width: Self.size.width, height: Self.size.height)
         .navigationTitle(section.title)
+        // Turning the experiment off while its section shows lands on Experiments.
+        .onChange(of: phoneOn) { _, on in
+            if !on, storedSection == .phone { storedSection = .experiments }
+        }
     }
 
     @ViewBuilder private var detail: some View {
         switch section {
         case .general: GeneralSettingsView(updater: updater)
+        case .phone:
+            if let phone {
+                PhoneSettingsView(phone: phone)
+            }
         case .experiments: ExperimentsSettingsView()
         case .debugging: DebuggingSettingsView(dataFolder: dataFolder)
         }

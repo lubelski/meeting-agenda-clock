@@ -20,12 +20,18 @@ let package = Package(
         // Pure logic: the object model, the timing rules, the one-line parser, and storage.
         // No UI. Every timing rule lives here and is tested.
         .target(name: "MeetingAgendaClockCore"),
+        // The phone clock: a small HTTP server on the local network, its request handling, and
+        // the page it serves. No UI, so it is tested without one.
+        .target(name: "MeetingAgendaClockServer", dependencies: ["MeetingAgendaClockCore"]),
         .executableTarget(
             name: "meeting-agenda-clock",
-            dependencies: ["MeetingAgendaClockCore"]
+            dependencies: ["MeetingAgendaClockCore", "MeetingAgendaClockServer"]
                 + (appStore ? [] : [.product(name: "Sparkle", package: "Sparkle")]),
             swiftSettings: appStore ? [] : [.define("SPARKLE")]
         ),
         .testTarget(name: "MeetingAgendaClockCoreTests", dependencies: ["MeetingAgendaClockCore"]),
+        .testTarget(
+            name: "MeetingAgendaClockServerTests",
+            dependencies: ["MeetingAgendaClockServer", "MeetingAgendaClockCore"]),
     ]
 )

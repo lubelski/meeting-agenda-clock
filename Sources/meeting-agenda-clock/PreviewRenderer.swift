@@ -1,6 +1,8 @@
 import AppKit
 import MeetingAgendaClockCore
+import MeetingAgendaClockServer
 import SwiftUI
+import WebKit
 
 /// `--render-previews <folder>`: draws each key view offscreen with sample data, writes PNG
 /// files, and exits. It never shows a window, never takes focus, and never reads or writes the
@@ -87,13 +89,18 @@ enum PreviewRenderer {
             ClockRoomView(state: ClockEngine.state(for: demoRun, at: at(13.5))),
             size: CGSize(width: 560, height: 320)))
 
-        // Settings, each section.
+        // Settings, each section. The phone clock shows as on, with a stand-in link that never
+        // listens: a placeholder address, name, port, and token.
+        defaults.set(true, forKey: Experiment.phoneClock.key)
+        let phone = PhoneClockController.preview(
+            port: 52741, token: "0123456789abcdef0123456789abcdef", ipv4: "192.168.1.20", hostName: "studio-mac.local")
         for section in SettingsSection.allCases {
             defaults.set(section.rawValue, forKey: "SettingsSelectedSection")
             save("settings-\(section.rawValue)", window(
-                SettingsRootView(dataFolder: AppPaths.dataFolder(arguments: []), updater: .unavailable()),
+                SettingsRootView(dataFolder: AppPaths.dataFolder(arguments: []), updater: .unavailable(), phone: phone),
                 size: SettingsRootView.size, now: at(0), defaults: defaults))
         }
+        defaults.set(SettingsSection.general.rawValue, forKey: "SettingsSelectedSection")
 
         // General as a release build shows it, with the Updates group.
         save("settings-general-release-build", window(
@@ -116,6 +123,29 @@ enum PreviewRenderer {
                 EdgeLineStrip(state: lineState).frame(height: EdgeLineController.thickness)
             },
             size: CGSize(width: 720, height: 12), scale: 6))
+
+        // The phone page, with a sample state baked in so it never connects. Written as HTML,
+        // then drawn by a WebKit view in a window that is never put on screen.
+        let pages: [(String, PhoneState)] = [
+            ("phone-page-running", PhoneState.make(run: demoRunForPhone(ten), agendas: SampleAgendas.all, at: at(12.5))),
+            ("phone-page-overtime", PhoneState.make(run: Run.start(demo, at: ten), agendas: SampleAgendas.all, at: at(41 + 20.0 / 60))),
+            ("phone-page-fixed-end", PhoneState.make(run: reviewRun, agendas: SampleAgendas.all, at: at(17))),
+            ("phone-page-idle", PhoneState.make(run: nil, agendas: SampleAgendas.all, at: at(0))),
+        ]
+        for (name, state) in pages {
+            let html = PhonePage.html(sample: state)
+            let url = folder.appending(path: "\(name).html")
+            do {
+                try html.write(to: url, atomically: true, encoding: .utf8)
+                written.append(url)
+            } catch {
+                print("Could not write \(url.path): \(error.localizedDescription)")
+            }
+            save("\(name)-portrait", webPage(html, size: CGSize(width: 390, height: 844)))
+            if name != "phone-page-idle" {
+                save("\(name)-landscape", webPage(html, size: CGSize(width: 844, height: 390)))
+            }
+        }
 
         for url in written { print(url.path) }
         try? FileManager.default.removeItem(at: scratch)
@@ -146,6 +176,55 @@ enum PreviewRenderer {
         hosting.cacheDisplay(in: hosting.bounds, to: rep)
         window.contentView = nil
         return rep
+    }
+
+    /// A sample run for the phone page: twelve and a half minutes into the weekly demo, after
+    /// an early tap out of Context.
+    private static func demoRunForPhone(_ ten: Date) -> Run {
+        var run = Run.start(SampleAgendas.weeklyDemo, at: ten)
+        run.record(.nextSection, at: ten.addingTimeInterval(9 * 60))
+        return run
+    }
+
+    /// An HTML page drawn by a WebKit view at a phone's size, in a window never put on screen.
+    private static func webPage(_ html: String, size: CGSize) -> NSBitmapImageRep? {
+        let configuration = WKWebViewConfiguration()
+        configuration.websiteDataStore = .nonPersistent()
+        let webView = WKWebView(frame: CGRect(origin: .zero, size: size), configuration: configuration)
+        let window = NSWindow(
+            contentRect: CGRect(origin: CGPoint(x: -20000, y: -20000), size: size),
+            styleMask: [.borderless], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = webView
+        let loaded = LoadWaiter()
+        webView.navigationDelegate = loaded
+        webView.loadHTMLString(html, baseURL: nil)
+        let deadline = Date().addingTimeInterval(10)
+        while !loaded.done, Date() < deadline {
+            RunLoop.current.run(until: Date().addingTimeInterval(0.05))
+        }
+        // Let the page's first render and layout settle.
+        RunLoop.current.run(until: Date().addingTimeInterval(0.6))
+        var image: NSImage?
+        var finished = false
+        let snapshot = WKSnapshotConfiguration()
+        snapshot.rect = CGRect(origin: .zero, size: size)
+        webView.takeSnapshot(with: snapshot) { result, _ in
+            image = result
+            finished = true
+        }
+        while !finished, Date() < deadline.addingTimeInterval(5) {
+            RunLoop.current.run(until: Date().addingTimeInterval(0.05))
+        }
+        window.contentView = nil
+        guard let cgImage = image?.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return nil }
+        return NSBitmapImageRep(cgImage: cgImage)
+    }
+
+    private final class LoadWaiter: NSObject, WKNavigationDelegate {
+        var done = false
+        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) { done = true }
+        func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) { done = true }
     }
 
     /// A pure SwiftUI view, drawn with `ImageRenderer`.

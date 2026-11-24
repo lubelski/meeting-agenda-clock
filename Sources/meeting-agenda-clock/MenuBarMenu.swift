@@ -8,6 +8,8 @@ struct MenuBarMenu: View {
     let model: AppModel
     let updater: AppUpdater
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.openSettings) private var openSettings
+    @AppStorage(Experiment.phoneClock.key) private var phoneOn = false
 
     var body: some View {
         if let run = model.run, let state = model.state(at: model.now) {
@@ -51,6 +53,13 @@ struct MenuBarMenu: View {
                 updater.checkForUpdates()
             }
             .disabled(!updater.canCheck)
+        }
+        if phoneOn {
+            Button("Show Phone Link…") {
+                UserDefaults.standard.set(SettingsSection.phone.rawValue, forKey: SettingsRootView.selectedSectionKey)
+                NSApp.activate()
+                openSettings()
+            }
         }
         SettingsLink { Text("Settings…") }
             .keyboardShortcut(",")

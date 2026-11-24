@@ -102,6 +102,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>LSMinimumSystemVersion</key><string>$MIN_OS</string>
   <key>LSApplicationCategoryType</key><string>public.app-category.productivity</string>
   <key>NSHighResolutionCapable</key><true/>
+  <key>NSLocalNetworkUsageDescription</key><string>With the phone clock experiment on, a phone on the same Wi-Fi opens the clock in its browser.</string>
   $UPDATER_KEYS
 </dict>
 </plist>

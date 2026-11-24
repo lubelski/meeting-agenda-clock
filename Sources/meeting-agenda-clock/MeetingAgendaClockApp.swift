@@ -34,7 +34,7 @@ struct MeetingAgendaClockApp: App {
         .restorationBehavior(.disabled)
 
         Settings {
-            SettingsRootView(dataFolder: model.store.folder, updater: updater)
+            SettingsRootView(dataFolder: model.store.folder, updater: updater, phone: model.phone)
         }
 
         MenuBarExtra {

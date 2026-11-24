@@ -1,5 +1,6 @@
 import AppKit
 import MeetingAgendaClockCore
+import MeetingAgendaClockServer
 import Observation
 import SwiftUI
 
@@ -9,7 +10,10 @@ import SwiftUI
 @Observable
 final class AppModel {
     var agendas: [Agenda] {
-        didSet { if persists { saveAgendas() } }
+        didSet {
+            if persists { saveAgendas() }
+            phone?.broadcast()
+        }
     }
 
     var run: Run? {
@@ -32,6 +36,8 @@ final class AppModel {
     @ObservationIgnored private var refresh: Timer?
     @ObservationIgnored let edgeLine = EdgeLineController()
     @ObservationIgnored private var defaultsObserver: NSObjectProtocol?
+    /// The phone clock experiment. Nil for previews, which never listen.
+    @ObservationIgnored private(set) var phone: PhoneClockController?
 
     init(store: AgendaStore, defaults: UserDefaults = .standard, agendas: [Agenda], run: Run?, persists: Bool) {
         self.store = store
@@ -56,6 +62,7 @@ final class AppModel {
         let run = try? store.loadRun()
         let model = AppModel(store: store, agendas: agendas, run: run, persists: problem == nil)
         model.problem = problem
+        model.phone = PhoneClockController(defaults: model.defaults, host: model)
         model.startObserving()
         return model
     }
@@ -66,9 +73,13 @@ final class AppModel {
         defaultsObserver = NotificationCenter.default.addObserver(
             forName: UserDefaults.didChangeNotification, object: defaults, queue: .main
         ) { [weak self] _ in
-            MainActor.assumeIsolated { self?.updateEdgeLine() }
+            MainActor.assumeIsolated {
+                self?.updateEdgeLine()
+                self?.updatePhone()
+            }
         }
         runChanged()
+        updatePhone()
     }
 
     // MARK: - Agendas
@@ -117,9 +128,13 @@ final class AppModel {
         return true
     }
 
-    func perform(_ kind: RunEvent.Kind, at date: Date = Date()) {
-        guard var run else { return }
-        if run.record(kind, at: date) { self.run = run }
+    /// Records `kind` on the run. Every control calls this: the running pane, the menu bar
+    /// menu, and the phone page. Returns whether it did anything.
+    @discardableResult
+    func perform(_ kind: RunEvent.Kind, at date: Date = Date()) -> Bool {
+        guard var run, run.record(kind, at: date) else { return false }
+        self.run = run
+        return true
     }
 
     func allows(_ kind: RunEvent.Kind) -> Bool {
@@ -148,6 +163,12 @@ final class AppModel {
             }
         }
         updateEdgeLine()
+        phone?.broadcast()
+    }
+
+    private func updatePhone() {
+        guard persists else { return }
+        phone?.update(enabled: Experiment.phoneClock.isOn(defaults))
     }
 
     private func updateEdgeLine() {
@@ -168,6 +189,27 @@ final class AppModel {
             try store.save(run)
         } catch {
             problem = "Could not save the run: \(error.localizedDescription)"
+        }
+    }
+}
+
+/// The phone page's view of the app. Its commands go through the same methods as the Mac's
+/// own controls.
+extension AppModel: PhoneClockHost {
+    func phoneState(at now: Date) -> PhoneState {
+        PhoneState.make(run: run, agendas: agendas, at: now)
+    }
+
+    func perform(_ command: PhoneCommand) -> Bool {
+        switch command {
+        case .start(let id):
+            return start(id)
+        case .run(let kind):
+            return perform(kind)
+        case .end:
+            guard run != nil else { return false }
+            endRun()
+            return true
         }
     }
 }

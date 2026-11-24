@@ -21,8 +21,8 @@ Read `README.md` first for what the app is and how to build it.
 - All timing logic lives in `MeetingAgendaClockCore` with tests. The app target has no timing rules.
 - Agendas persist as JSON (`agendas.json`, `run.json`) in the data folder. `--data-folder <path>`
   points elsewhere. Use it, or `--render-previews`, for every check, never the owner's real data.
-- Experiments are switches in Settings, off by default, backed by the `Experiment` enum. Only
-  Edge line is built. The others say "Not built yet." and do nothing.
+- Experiments are switches in Settings, off by default, backed by the `Experiment` enum. Edge
+  line and Phone clock over Wi-Fi are built. The others say "Not built yet." and do nothing.
 - The edge line is meant to be seen by screen-share viewers. Never set `sharingType = .none` or
   hide it from capture.
 - Settings: Debugging is always last, Experiments just above it. Keep font weight constant across
@@ -63,3 +63,20 @@ Read `README.md` first for what the app is and how to build it.
 - Only a build from `scripts/release.sh` has a feed URL and public key, so only it updates.
   `scripts/release.sh --check` and `--dry-run` exist; run a real release only when the owner asks.
   Do not generate Sparkle keys or touch the Keychain.
+
+## Phone clock over Wi-Fi
+
+- `MeetingAgendaClockServer` holds the server (`NWListener` with a hand-written HTTP handler),
+  the routes, and the page. No UI, no third-party code. The app target only wires it up
+  (`PhoneClockController`) and draws Settings, Phone.
+- Nothing listens while the experiment is off. No Bonjour advertising yet.
+- Every request needs the token (`?t=`), or gets 403. The port and token persist in the
+  preferences; New Link replaces the token and closes open event streams.
+- The page is one self-contained HTML document: inline CSS and JS, no external resources, no
+  `confirm()`, neutral white fill and the overtime color, no blue.
+- Do not port timing rules to JavaScript. The page draws from `ScheduleSnapshot` (core), which
+  the server sends over Server-Sent Events, and corrects for the clock difference.
+- Phone commands go through `AppModel.perform`, `start`, and `endRun`, the same methods as the
+  Mac's controls.
+- Both entitlements files have `com.apple.security.network.server`. Listening for and accepting
+  TCP connections does not need the Local Network privilege (TN3179), so there is no prompt.

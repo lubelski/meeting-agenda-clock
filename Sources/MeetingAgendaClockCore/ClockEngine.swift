@@ -65,6 +65,13 @@ public struct ClockState: Hashable, Sendable {
 /// never pauses, so for it active time is wall-clock time.
 public enum ClockEngine {
     public static func state(for run: Run, at now: Date) -> ClockState {
+        let (layout, t, isPaused) = replay(run, at: now)
+        return layout.state(at: t, now: now, isPaused: isPaused, agendaName: run.agenda.name)
+    }
+
+    /// Replays the run's events, and returns the layout, the active time at `now`, and whether
+    /// the run is paused.
+    static func replay(_ run: Run, at now: Date) -> (Layout, TimeInterval, Bool) {
         var layout = Layout(run: run)
         var pausedTotal: TimeInterval = 0
         var pausedSince: Date?
@@ -94,8 +101,7 @@ public enum ClockEngine {
                 layout.apply(event.kind, at: t)
             }
         }
-        let t = active(now)
-        return layout.state(at: t, now: now, isPaused: pausedSince != nil, agendaName: run.agenda.name)
+        return (layout, active(now), pausedSince != nil)
     }
 }
 
