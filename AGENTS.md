@@ -80,3 +80,16 @@ Read `README.md` first for what the app is and how to build it.
   Mac's controls.
 - Both entitlements files have `com.apple.security.network.server`. Listening for and accepting
   TCP connections does not need the Local Network privilege (TN3179), so there is no prompt.
+
+## App icon
+
+- The icon is drawn in Swift, in `Sources/MeetingAgendaClockCore/AppIconDrawing.swift`: four
+  designs on the app's segmented bar, `AppIconDrawing.shipped` is the one in the app.
+- `scripts/render-icon.sh` writes `Resources/AppIcon.icon` (Icon Composer) and `docs/icon.png`
+  from it, and launches nothing. `scripts/render-icon.sh <1-4>` writes another design;
+  `--previews <folder>` writes every design at 1024 and 64 px plus a contact sheet, and leaves
+  the repo alone. Commit what the plain run writes.
+- To ship another design, change `shipped` and run `scripts/render-icon.sh`. A test fails if
+  the committed icon is not the shipped design.
+- `scripts/bundle.sh` compiles the icon with `actool` in both variants. While the owner runs the
+  copy in `build/`, bundle checks into another folder with `MEETING_AGENDA_CLOCK_BUNDLE_DIR`.

@@ -8,6 +8,8 @@
 #   MEETING_AGENDA_CLOCK_FEED_URL          The Sparkle feed. Set by scripts/release.sh, together
 #   MEETING_AGENDA_CLOCK_PUBLIC_KEY        with the public key that updates are signed with. A
 #                                          build without these two never updates itself.
+#   MEETING_AGENDA_CLOCK_BUNDLE_DIR        The folder the app goes in. Defaults to build. Use
+#                                          another to check a build while a copy from build runs.
 #   MEETING_AGENDA_CLOCK_VERSION           The version to show, such as 1.2.0. Defaults to the
 #                                          latest v* tag, or 0.1 without one.
 #   MEETING_AGENDA_CLOCK_SIGNING_IDENTITY  The signing identity. See "Sign" below for the default.
@@ -29,7 +31,9 @@ fi
 swift build "${SWIFT_ARGS[@]}"
 BIN="$(swift build "${SWIFT_ARGS[@]}" --show-bin-path)/meeting-agenda-clock"
 
-APP="build/meeting-agenda-clock.app"
+BUNDLE_DIR="${MEETING_AGENDA_CLOCK_BUNDLE_DIR:-build}"
+mkdir -p "$BUNDLE_DIR"
+APP="$BUNDLE_DIR/meeting-agenda-clock.app"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/meeting-agenda-clock"
@@ -85,7 +89,22 @@ if ! $APP_STORE; then
   fi
 fi
 
-# No app icon yet: the system's generic one stands in.
+# The app icon. actool compiles the Icon Composer file into Assets.car, which macOS draws
+# with the system's glass, and AppIcon.icns, a flat copy for places that read only that.
+# Info.plist names both below. scripts/render-icon.sh redraws the icon's artwork.
+ICON_PLIST_DIR="$(mktemp -d)"
+xcrun actool Resources/AppIcon.icon --compile "$APP/Contents/Resources" \
+  --platform macosx --minimum-deployment-target "$MIN_OS" --app-icon AppIcon \
+  --output-partial-info-plist "$ICON_PLIST_DIR/icon.plist" --errors --warnings \
+  --output-format human-readable-text >/dev/null
+rm -rf "$ICON_PLIST_DIR"
+for f in Assets.car AppIcon.icns; do
+  if [[ ! -f "$APP/Contents/Resources/$f" ]]; then
+    echo "error: actool did not produce $f from Resources/AppIcon.icon" >&2
+    exit 1
+  fi
+done
+
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -95,6 +114,8 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundleDisplayName</key><string>meeting-agenda-clock</string>
   <key>CFBundleIdentifier</key><string>dev.lubelski.meeting-agenda-clock</string>
   <key>CFBundleExecutable</key><string>meeting-agenda-clock</string>
+  <key>CFBundleIconFile</key><string>AppIcon</string>
+  <key>CFBundleIconName</key><string>AppIcon</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>$VERSION</string>
   <key>CFBundleVersion</key><string>$BUILD_NUMBER</string>
