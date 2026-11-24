@@ -2,6 +2,12 @@
 # Builds meeting-agenda-clock.app into ./build. It installs nothing and launches nothing.
 #
 # Environment, all optional:
+#   MEETING_AGENDA_CLOCK_APP_STORE         1 builds without Sparkle, for a future Mac App Store
+#                                          build: no Sparkle code, framework, or update UI. It
+#                                          uses its own .build-app-store scratch folder.
+#   MEETING_AGENDA_CLOCK_FEED_URL          The Sparkle feed. Set by scripts/release.sh, together
+#   MEETING_AGENDA_CLOCK_PUBLIC_KEY        with the public key that updates are signed with. A
+#                                          build without these two never updates itself.
 #   MEETING_AGENDA_CLOCK_VERSION           The version to show, such as 1.2.0. Defaults to the
 #                                          latest v* tag, or 0.1 without one.
 #   MEETING_AGENDA_CLOCK_SIGNING_IDENTITY  The signing identity. See "Sign" below for the default.
@@ -13,13 +19,31 @@ if [[ -z "${DEVELOPER_DIR:-}" && -d /Applications/Xcode.app ]]; then
   export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
 fi
 
-swift build -c release --arch arm64
-BIN="$(swift build -c release --arch arm64 --show-bin-path)/meeting-agenda-clock"
+APP_STORE=false
+SWIFT_ARGS=(-c release --arch arm64)
+if [[ "${MEETING_AGENDA_CLOCK_APP_STORE:-}" == "1" ]]; then
+  APP_STORE=true
+  # Its own scratch folder, so SwiftPM never reuses the Sparkle build's manifest.
+  SWIFT_ARGS+=(--scratch-path .build-app-store)
+fi
+swift build "${SWIFT_ARGS[@]}"
+BIN="$(swift build "${SWIFT_ARGS[@]}" --show-bin-path)/meeting-agenda-clock"
 
 APP="build/meeting-agenda-clock.app"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/meeting-agenda-clock"
+
+# Sparkle, the updater, in the Developer ID build only. SwiftPM builds it next to the binary
+# but does not know about app bundles, so copy it in and tell the binary where to find it.
+if ! $APP_STORE; then
+  mkdir -p "$APP/Contents/Frameworks"
+  ditto "$(dirname "$BIN")/Sparkle.framework" "$APP/Contents/Frameworks/Sparkle.framework"
+  install_name_tool -add_rpath @executable_path/../Frameworks "$APP/Contents/MacOS/meeting-agenda-clock"
+elif otool -L "$APP/Contents/MacOS/meeting-agenda-clock" | grep -q Sparkle; then
+  echo "error: the App Store build links Sparkle" >&2
+  exit 1
+fi
 
 # SwiftPM writes the deployment target into the binary's SDK field. macOS reads that field
 # to decide whether to run the app in a compatibility mode for older apps, so stamp the
@@ -43,6 +67,24 @@ VERSION="${MEETING_AGENDA_CLOCK_VERSION:-${LATEST_TAG#v}}"
 VERSION="${VERSION:-0.1}"
 BUILD_NUMBER="$(git rev-list --count HEAD 2>/dev/null || echo 1)"
 
+# The app is sandboxed, so Sparkle installs through its Installer XPC service and, having no
+# network entitlement of its own, downloads through its Downloader XPC service. Both are
+# turned on here. The feed and key come only from scripts/release.sh.
+UPDATER_KEYS=""
+ENTITLEMENTS=Resources/meeting-agenda-clock.entitlements
+if ! $APP_STORE; then
+  ENTITLEMENTS=Resources/meeting-agenda-clock-sparkle.entitlements
+  UPDATER_KEYS="<key>SUEnableInstallerLauncherService</key><true/>
+  <key>SUEnableDownloaderService</key><true/>"
+  if [[ -n "${MEETING_AGENDA_CLOCK_FEED_URL:-}" && -n "${MEETING_AGENDA_CLOCK_PUBLIC_KEY:-}" ]]; then
+    UPDATER_KEYS="$UPDATER_KEYS
+  <key>SUFeedURL</key><string>$MEETING_AGENDA_CLOCK_FEED_URL</string>
+  <key>SUPublicEDKey</key><string>$MEETING_AGENDA_CLOCK_PUBLIC_KEY</string>
+  <key>SUEnableAutomaticChecks</key><true/>
+  <key>SUAutomaticallyUpdate</key><true/>"
+  fi
+fi
+
 # No app icon yet: the system's generic one stands in.
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -60,6 +102,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>LSMinimumSystemVersion</key><string>$MIN_OS</string>
   <key>LSApplicationCategoryType</key><string>public.app-category.productivity</string>
   <key>NSHighResolutionCapable</key><true/>
+  $UPDATER_KEYS
 </dict>
 </plist>
 PLIST
@@ -85,12 +128,23 @@ if [[ "$IDENTITY" == *"Developer ID Application"* ]]; then
   # Notarization needs the hardened runtime and a secure timestamp.
   SIGN+=(--options runtime --timestamp)
 fi
-# The entitlements turn on the App Sandbox, and nothing else.
-"${SIGN[@]}" --entitlements Resources/meeting-agenda-clock.entitlements "$APP"
+# Sparkle's helpers are signed one at a time, innermost first, as its documentation says, and
+# never with --deep: the Downloader keeps its own entitlements.
+if ! $APP_STORE; then
+  SPARKLE="$APP/Contents/Frameworks/Sparkle.framework"
+  "${SIGN[@]}" "$SPARKLE/Versions/B/XPCServices/Installer.xpc"
+  "${SIGN[@]}" --preserve-metadata=entitlements "$SPARKLE/Versions/B/XPCServices/Downloader.xpc"
+  "${SIGN[@]}" "$SPARKLE/Versions/B/Autoupdate"
+  "${SIGN[@]}" "$SPARKLE/Versions/B/Updater.app"
+  "${SIGN[@]}" "$SPARKLE"
+fi
+# The App Sandbox, plus Sparkle's mach-lookup exceptions in the Developer ID build.
+"${SIGN[@]}" --entitlements "$ENTITLEMENTS" "$APP"
 codesign --verify --deep --strict "$APP"
 if [[ "$IDENTITY" == "-" ]]; then
   echo "Signed ad hoc."
 else
   echo "Signed with \"$IDENTITY\""
 fi
+$APP_STORE && echo "App Store variant: no Sparkle."
 echo "Built $APP, version $VERSION ($BUILD_NUMBER), commit $GIT_COMMIT"

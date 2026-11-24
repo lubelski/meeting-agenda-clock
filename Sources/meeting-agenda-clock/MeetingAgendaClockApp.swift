@@ -6,6 +6,7 @@ import SwiftUI
 /// Started from `main.swift`, which handles `--render-previews` first.
 struct MeetingAgendaClockApp: App {
     @State private var model = AppModel.live()
+    @State private var updater = AppUpdater()
 
     var body: some Scene {
         Window("Agendas", id: WindowID.agendas) {
@@ -14,6 +15,14 @@ struct MeetingAgendaClockApp: App {
         }
         .defaultSize(width: 900, height: 640)
         .windowResizability(.contentMinSize)
+        .commands {
+            CommandGroup(after: .appInfo) {
+                if updater.isAvailable {
+                    Button("Check for Updates…") { updater.checkForUpdates() }
+                        .disabled(!updater.canCheck)
+                }
+            }
+        }
 
         Window("Clock", id: WindowID.clock) {
             ClockWindowView(model: model)
@@ -25,11 +34,11 @@ struct MeetingAgendaClockApp: App {
         .restorationBehavior(.disabled)
 
         Settings {
-            SettingsRootView(dataFolder: model.store.folder)
+            SettingsRootView(dataFolder: model.store.folder, updater: updater)
         }
 
         MenuBarExtra {
-            MenuBarMenu(model: model)
+            MenuBarMenu(model: model, updater: updater)
         } label: {
             Image(systemName: model.run == nil ? "clock" : "clock.fill")
                 .accessibilityLabel("Meeting Agenda Clock")

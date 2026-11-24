@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!-- The Developer ID build's entitlements: the App Sandbox, as in meeting-agenda-clock.entitlements, plus what Sparkle needs in a sandboxed app. The App Store build uses meeting-agenda-clock.entitlements, which has none of this. -->
+  <key>com.apple.security.app-sandbox</key><true/>
+  <!-- Lets the app talk to Sparkle's installer tools once they run (Sparkle's sandboxing documentation). The names are the bundle identifier with -spks and -spki. -->
+  <key>com.apple.security.temporary-exception.mach-lookup.global-name</key>
+  <array>
+    <string>dev.lubelski.meeting-agenda-clock-spks</string>
+    <string>dev.lubelski.meeting-agenda-clock-spki</string>
+  </array>
+  <!-- No com.apple.security.network.client: the app needs no network of its own, so Sparkle downloads through its Downloader XPC service (SUEnableDownloaderService in Info.plist). -->
+</dict>
+</plist>

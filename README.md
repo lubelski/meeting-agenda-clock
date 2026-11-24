@@ -21,6 +21,10 @@ scripts/bundle.sh            # builds build/meeting-agenda-clock.app, installs a
 open build/meeting-agenda-clock.app
 ```
 
+A release build updates itself with Sparkle (`scripts/release.sh`, see the top of that file).
+`MEETING_AGENDA_CLOCK_APP_STORE=1 scripts/bundle.sh` builds the variant for a future Mac App
+Store submission, with no Sparkle in it.
+
 Launch arguments:
 
 - `--data-folder <path>` keeps agendas and the run in that folder instead of

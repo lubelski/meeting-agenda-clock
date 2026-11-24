@@ -6,6 +6,7 @@ import SwiftUI
 /// controls. With none it lists the agendas to start.
 struct MenuBarMenu: View {
     let model: AppModel
+    let updater: AppUpdater
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
@@ -44,6 +45,13 @@ struct MenuBarMenu: View {
         }
         Button("Show Clock Window") { open(WindowID.clock) }
         Button("Agendas…") { open(WindowID.agendas) }
+        if updater.isAvailable {
+            Button("Check for Updates…") {
+                NSApp.activate()
+                updater.checkForUpdates()
+            }
+            .disabled(!updater.canCheck)
+        }
         SettingsLink { Text("Settings…") }
             .keyboardShortcut(",")
         Divider()

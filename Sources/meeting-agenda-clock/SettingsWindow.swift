@@ -37,6 +37,7 @@ struct SettingsRootView: View {
     static let size = CGSize(width: 700, height: 460)
 
     let dataFolder: URL
+    let updater: AppUpdater
     @AppStorage("SettingsSelectedSection") private var section: SettingsSection = .general
     @Environment(\.isRenderingPreview) private var rendering
 
@@ -73,7 +74,7 @@ struct SettingsRootView: View {
 
     @ViewBuilder private var detail: some View {
         switch section {
-        case .general: GeneralSettingsView()
+        case .general: GeneralSettingsView(updater: updater)
         case .experiments: ExperimentsSettingsView()
         case .debugging: DebuggingSettingsView(dataFolder: dataFolder)
         }
@@ -81,6 +82,10 @@ struct SettingsRootView: View {
 }
 
 struct GeneralSettingsView: View {
+    let updater: AppUpdater
+    /// Shows the Updates group as a release build would, for `--render-previews`.
+    var showsUpdatesForPreview = false
+    @State private var updatesAutomatically = false
     @AppStorage(GeneralPreference.openAtLoginKey) private var openAtLogin = false
     @AppStorage(GeneralPreference.defaultEndRuleKey) private var defaultEndRule: EndRule = .setByLength
     @AppStorage(GeneralPreference.openClockWindowOnStartKey)
@@ -115,8 +120,31 @@ struct GeneralSettingsView: View {
                     Text("The big countdown, for the display you are not sharing.")
                 }
             }
+            // Only a release build with Sparkle updates itself. An App Store build updates
+            // through the store and shows nothing here.
+            if updater.isAvailable || showsUpdatesForPreview {
+                Section {
+                    Toggle(isOn: Binding(
+                        get: { updatesAutomatically },
+                        set: {
+                            updatesAutomatically = $0
+                            updater.updatesAutomatically = $0
+                        })) {
+                        Text("Update automatically")
+                        Text("Checks about once a day, downloads a newer release, and installs it when the app quits. Check for Updates is also in the app menu and the menu bar menu.")
+                    }
+                    HStack {
+                        Spacer()
+                        Button("Check for Updates…") { updater.checkForUpdates() }
+                            .disabled(!updater.canCheck)
+                    }
+                } header: {
+                    Text("Updates")
+                }
+            }
         }
         .formStyle(.grouped)
+        .onAppear { updatesAutomatically = showsUpdatesForPreview || updater.updatesAutomatically }
     }
 
     private func applyOpenAtLogin(_ on: Bool) {

@@ -91,9 +91,16 @@ enum PreviewRenderer {
         for section in SettingsSection.allCases {
             defaults.set(section.rawValue, forKey: "SettingsSelectedSection")
             save("settings-\(section.rawValue)", window(
-                SettingsRootView(dataFolder: AppPaths.dataFolder(arguments: [])),
+                SettingsRootView(dataFolder: AppPaths.dataFolder(arguments: []), updater: .unavailable()),
                 size: SettingsRootView.size, now: at(0), defaults: defaults))
         }
+
+        // General as a release build shows it, with the Updates group.
+        save("settings-general-release-build", window(
+            GeneralSettingsView(updater: .unavailable(), showsUpdatesForPreview: true)
+                .frame(width: SettingsRootView.size.width - SettingsRootView.sidebarWidth),
+            size: CGSize(width: SettingsRootView.size.width - SettingsRootView.sidebarWidth, height: 400),
+            now: at(0), defaults: defaults))
 
         // The edge line along the bottom of a stand-in screen, at its real 2 pt, and magnified.
         let lineState = ClockEngine.state(for: Run.start(demo, at: ten), at: at(12.5))

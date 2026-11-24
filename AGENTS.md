@@ -42,3 +42,24 @@ Read `README.md` first for what the app is and how to build it.
   with `MEETING_AGENDA_CLOCK_SIGNING_IDENTITY`, else a Developer ID, else a
   `meeting-agenda-clock development` certificate, else ad hoc. Do not create certificates.
 - Run `swift build` and `swift test` before committing.
+
+## Updates and the App Store
+
+- The Developer ID build updates itself with Sparkle. The Mac App Store does not allow Sparkle,
+  so every Sparkle reference stays behind one seam: `Sources/meeting-agenda-clock/AppUpdater.swift`,
+  inside `#if SPARKLE`. No other file imports Sparkle or uses its types. Views ask
+  `AppUpdater.isAvailable` and show no update UI when it is false.
+- `Package.swift` adds the Sparkle package and defines `SPARKLE` unless
+  `MEETING_AGENDA_CLOCK_APP_STORE=1`. Build that variant with its own scratch folder:
+  `MEETING_AGENDA_CLOCK_APP_STORE=1 swift build --scratch-path .build-app-store`, or
+  `MEETING_AGENDA_CLOCK_APP_STORE=1 scripts/bundle.sh`, which fails if the binary links Sparkle.
+  Build both ways after touching updates.
+- The app is sandboxed, so Sparkle runs through its XPC services. Info.plist sets
+  `SUEnableInstallerLauncherService` and `SUEnableDownloaderService` (the app has no network
+  entitlement of its own), and `Resources/meeting-agenda-clock-sparkle.entitlements` adds the
+  mach-lookup exceptions `<bundle id>-spks` and `<bundle id>-spki`. The App Store variant signs
+  with `Resources/meeting-agenda-clock.entitlements`, which has none of these. Sign Sparkle's
+  helpers one by one, never with `--deep`.
+- Only a build from `scripts/release.sh` has a feed URL and public key, so only it updates.
+  `scripts/release.sh --check` and `--dry-run` exist; run a real release only when the owner asks.
+  Do not generate Sparkle keys or touch the Keychain.
